@@ -1,2 +1,2 @@
-# api-sdqbilling-backend
-SDQ Billing
+# api-demo-backend
+DEMO Admin Panel
