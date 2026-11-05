@@ -35,12 +35,18 @@ module.exports = {
         'any.required': 'Email address is required',
         'string.email': 'Please enter a valid email address',
       }),
+    taxType: Joi.string().valid('GST', 'VAT').allow('', null).optional(),
+    currency: Joi.string().allow('', null).max(10).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
     state_id: Joi.alternatives().try(
+      Joi.string().allow('', null),
+      Joi.object()
+    ).optional(),
+    city_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
@@ -81,12 +87,18 @@ module.exports = {
         'string.empty': 'Email address cannot be empty',
         'string.email': 'Please enter a valid email address',
       }),
+    taxType: Joi.string().valid('GST', 'VAT').allow('', null).optional(),
+    currency: Joi.string().allow('', null).max(10).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
     state_id: Joi.alternatives().try(
+      Joi.string().allow('', null),
+      Joi.object()
+    ).optional(),
+    city_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),

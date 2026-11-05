@@ -20,6 +20,7 @@ module.exports = {
       const data = await Partys.find()
         .populate('country_id', 'name')
         .populate('state_id', 'name country_id')
+        .populate('city_id', 'name country_id')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
@@ -34,7 +35,8 @@ module.exports = {
     try {
       return await Partys.findById(id)
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id');
+        .populate('state_id', 'name country_id')
+        .populate('city_id', 'name country_id');
     } catch (error) {
       logger.error('Error in getById:', error);
       throw error;
@@ -95,11 +97,18 @@ module.exports = {
       if (!data.state_id) {
         data.state_id = null;
       }
+      if (data.city_id && typeof data.city_id === 'object') {
+        data.city_id = data.city_id._id || data.city_id.id;
+      }
+      if (!data.city_id) {
+        data.city_id = null;
+      }
 
       const created = await Partys.create(data);
       return await Partys.findById(created._id)
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id');
+        .populate('state_id', 'name country_id')
+        .populate('city_id', 'name country_id');
     } catch (error) {
       logger.error('Error in create:', error);
       throw error;
@@ -169,10 +178,17 @@ module.exports = {
       if (data.state_id === '') {
         data.state_id = null;
       }
+      if (data.city_id && typeof data.city_id === 'object') {
+        data.city_id = data.city_id._id || data.city_id.id;
+      }
+      if (data.city_id === '') {
+        data.city_id = null;
+      }
 
       return await Partys.findByIdAndUpdate(id, data, { new: true, runValidators: true })
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id');
+        .populate('state_id', 'name country_id')
+        .populate('city_id', 'name country_id');
     } catch (error) {
       logger.error('Error in update:', error);
       throw error;

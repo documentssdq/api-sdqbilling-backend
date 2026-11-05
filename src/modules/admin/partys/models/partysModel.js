@@ -22,6 +22,16 @@ const partysSchema = new mongoose.Schema(
       lowercase: true,
       unique: true,
     },
+    taxType: {
+      type: String,
+      enum: ['GST', 'VAT'],
+      default: 'GST',
+    },
+    currency: {
+      type: String,
+      default: 'INR',
+      trim: true,
+    },
     gstin: { type: String, trim: true, default: '' },
     country_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -31,6 +41,11 @@ const partysSchema = new mongoose.Schema(
     state_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'State',
+      default: null,
+    },
+    city_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'City',
       default: null,
     },
     city: { type: String, trim: true, default: '' },
@@ -71,5 +86,6 @@ partysSchema.index({ email: 1 }, { unique: true });
 partysSchema.index({ gstin: 1 });
 partysSchema.index({ country_id: 1 });
 partysSchema.index({ state_id: 1 });
+partysSchema.index({ city_id: 1 });
 
 module.exports = mongoose.model('Partys', partysSchema);

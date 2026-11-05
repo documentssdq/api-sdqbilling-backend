@@ -11,6 +11,10 @@ module.exports = {
       'string.empty': 'Category is required',
       'any.required': 'Category is required',
     }),
+    subcategory_id: Joi.alternatives().try(
+      Joi.string().allow('', null).optional(),
+      Joi.object().optional()
+    ).optional(),
     ccategory_id: Joi.any().optional(),
     name: Joi.string().trim().min(1).max(100).required().messages({
       'string.empty': 'Name is required',
@@ -31,6 +35,10 @@ module.exports = {
       'string.empty': 'Category is required',
       'any.required': 'Category is required',
     }),
+    subcategory_id: Joi.alternatives().try(
+      Joi.string().allow('', null).optional(),
+      Joi.object().optional()
+    ).optional(),
     ccategory_id: Joi.any().optional(),
     name: Joi.string().trim().min(1).max(100).optional().messages({
       'string.empty': 'Name cannot be empty',

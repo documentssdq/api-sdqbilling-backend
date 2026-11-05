@@ -7,6 +7,11 @@ const servicesSchema = new mongoose.Schema(
       ref: 'Categorys',
       required: true,
     },
+    subcategory_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subcategorys',
+      default: null,
+    },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
@@ -31,6 +36,7 @@ const servicesSchema = new mongoose.Schema(
 );
 
 servicesSchema.index({ category_id: 1 });
+servicesSchema.index({ subcategory_id: 1 });
 servicesSchema.index({ name: 1 });
 
 module.exports = mongoose.model('Services', servicesSchema);

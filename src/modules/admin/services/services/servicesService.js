@@ -1,13 +1,18 @@
 const Services = require('../models/servicesModel');
-  const { formatPagination } = require('../../../../utils/helpers');
-  const logger = require('../../../../services/logger');
+const { formatPagination } = require('../../../../utils/helpers');
+const logger = require('../../../../services/logger');
 
 module.exports = {
   async getAll(page = 1, limit = 10) {
     try {
       const { skip } = formatPagination(page, limit);
       const total = await Services.countDocuments();
-      const data = await Services.find().populate('category_id', 'name').sort({ createdAt: -1 }).skip(skip).limit(limit);
+      const data = await Services.find()
+        .populate('category_id', 'name')
+        .populate('subcategory_id', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
       return { data, total };
     } catch (error) {
       logger.error('Error in getAll:', error);
@@ -17,7 +22,9 @@ module.exports = {
 
   async getById(id) {
     try {
-      return await Services.findById(id).populate('category_id', 'name');
+      return await Services.findById(id)
+        .populate('category_id', 'name')
+        .populate('subcategory_id', 'name');
     } catch (error) {
       logger.error('Error in getById:', error);
       throw error;
@@ -32,10 +39,18 @@ module.exports = {
       if (data.category_id && typeof data.category_id === 'object') {
         data.category_id = data.category_id._id || data.category_id.id;
       }
+      if (data.subcategory_id && typeof data.subcategory_id === 'object') {
+        data.subcategory_id = data.subcategory_id._id || data.subcategory_id.id;
+      }
+      if (!data.subcategory_id) {
+        data.subcategory_id = null;
+      }
       const existing = await Services.findOne({ name: data.name });
       if (existing) throw new Error('Name already exists');
       const created = await Services.create(data);
-      return await Services.findById(created._id).populate('category_id', 'name');
+      return await Services.findById(created._id)
+        .populate('category_id', 'name')
+        .populate('subcategory_id', 'name');
     } catch (error) {
       logger.error('Error in create:', error);
       throw error;
@@ -50,7 +65,15 @@ module.exports = {
       if (data.category_id && typeof data.category_id === 'object') {
         data.category_id = data.category_id._id || data.category_id.id;
       }
-      return await Services.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate('category_id', 'name');
+      if (data.subcategory_id && typeof data.subcategory_id === 'object') {
+        data.subcategory_id = data.subcategory_id._id || data.subcategory_id.id;
+      }
+      if (!data.subcategory_id) {
+        data.subcategory_id = null;
+      }
+      return await Services.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+        .populate('category_id', 'name')
+        .populate('subcategory_id', 'name');
     } catch (error) {
       logger.error('Error in update:', error);
       throw error;
