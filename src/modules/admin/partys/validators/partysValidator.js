@@ -36,7 +36,11 @@ module.exports = {
         'string.email': 'Please enter a valid email address',
       }),
     taxType: Joi.string().valid('GST', 'VAT').allow('', null).optional(),
-    currency: Joi.string().allow('', null).max(10).optional(),
+    currency_id: Joi.alternatives().try(
+      Joi.string().allow('', null),
+      Joi.object()
+    ).optional(),
+    currency: Joi.string().allow('', null).max(50).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
       Joi.string().allow('', null),
@@ -88,7 +92,11 @@ module.exports = {
         'string.email': 'Please enter a valid email address',
       }),
     taxType: Joi.string().valid('GST', 'VAT').allow('', null).optional(),
-    currency: Joi.string().allow('', null).max(10).optional(),
+    currency_id: Joi.alternatives().try(
+      Joi.string().allow('', null),
+      Joi.object()
+    ).optional(),
+    currency: Joi.string().allow('', null).max(50).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
       Joi.string().allow('', null),

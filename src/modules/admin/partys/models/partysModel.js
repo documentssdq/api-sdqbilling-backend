@@ -27,6 +27,11 @@ const partysSchema = new mongoose.Schema(
       enum: ['GST', 'VAT'],
       default: 'GST',
     },
+    currency_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Currency',
+      default: null,
+    },
     currency: {
       type: String,
       default: 'INR',
@@ -84,6 +89,7 @@ partysSchema.index({ partyType: 1 });
 partysSchema.index({ phone: 1 }, { unique: true });
 partysSchema.index({ email: 1 }, { unique: true });
 partysSchema.index({ gstin: 1 });
+partysSchema.index({ currency_id: 1 });
 partysSchema.index({ country_id: 1 });
 partysSchema.index({ state_id: 1 });
 partysSchema.index({ city_id: 1 });
