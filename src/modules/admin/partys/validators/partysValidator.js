@@ -40,13 +40,8 @@ module.exports = {
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
-    currency: Joi.string().allow('', null).max(50).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
-      Joi.string().allow('', null),
-      Joi.object()
-    ).optional(),
-    state_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
@@ -54,11 +49,7 @@ module.exports = {
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
-    city: Joi.string().allow('', null).max(100).optional(),
-    state: Joi.string().allow('', null).max(100).optional(),
     address: Joi.string().allow('', null).max(300).optional(),
-    openingBalance: Joi.number().allow(null).optional(),
-    openingBalanceType: Joi.string().valid('debit', 'credit').optional(),
     description: Joi.string().allow('', null).max(500).optional(),
     isActive: Joi.boolean().optional(),
   }).unknown(true),
@@ -96,13 +87,8 @@ module.exports = {
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
-    currency: Joi.string().allow('', null).max(50).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
-      Joi.string().allow('', null),
-      Joi.object()
-    ).optional(),
-    state_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
@@ -110,11 +96,7 @@ module.exports = {
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),
-    city: Joi.string().allow('', null).max(100).optional(),
-    state: Joi.string().allow('', null).max(100).optional(),
     address: Joi.string().allow('', null).max(300).optional(),
-    openingBalance: Joi.number().allow(null).optional(),
-    openingBalanceType: Joi.string().valid('debit', 'credit').optional(),
     description: Joi.string().allow('', null).max(500).optional(),
     isActive: Joi.boolean().optional(),
   }).unknown(true),

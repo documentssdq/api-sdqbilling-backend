@@ -19,7 +19,6 @@ module.exports = {
       const total = await Partys.countDocuments();
       const data = await Partys.find()
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id')
         .populate('city_id', 'name country_id')
         .populate('currency_id', 'name code symbol')
         .sort({ createdAt: -1 })
@@ -36,7 +35,6 @@ module.exports = {
     try {
       return await Partys.findById(id)
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id')
         .populate('city_id', 'name country_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
@@ -86,18 +84,12 @@ module.exports = {
         }
       }
 
-      // 3. Normalize country_id, state_id, city_id, currency_id
+      // 3. Normalize country_id, city_id, currency_id
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
       if (!data.country_id) {
         data.country_id = null;
-      }
-      if (data.state_id && typeof data.state_id === 'object') {
-        data.state_id = data.state_id._id || data.state_id.id;
-      }
-      if (!data.state_id) {
-        data.state_id = null;
       }
       if (data.city_id && typeof data.city_id === 'object') {
         data.city_id = data.city_id._id || data.city_id.id;
@@ -115,7 +107,6 @@ module.exports = {
       const created = await Partys.create(data);
       return await Partys.findById(created._id)
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id')
         .populate('city_id', 'name country_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
@@ -174,18 +165,12 @@ module.exports = {
         }
       }
 
-      // 3. Normalize country_id, state_id, city_id, currency_id
+      // 3. Normalize country_id, city_id, currency_id
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
       if (data.country_id === '') {
         data.country_id = null;
-      }
-      if (data.state_id && typeof data.state_id === 'object') {
-        data.state_id = data.state_id._id || data.state_id.id;
-      }
-      if (data.state_id === '') {
-        data.state_id = null;
       }
       if (data.city_id && typeof data.city_id === 'object') {
         data.city_id = data.city_id._id || data.city_id.id;
@@ -202,7 +187,6 @@ module.exports = {
 
       return await Partys.findByIdAndUpdate(id, data, { new: true, runValidators: true })
         .populate('country_id', 'name')
-        .populate('state_id', 'name country_id')
         .populate('city_id', 'name country_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
