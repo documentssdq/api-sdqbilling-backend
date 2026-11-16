@@ -7,6 +7,11 @@ const citySchema = new mongoose.Schema(
       ref: 'Countries',
       required: [true, 'Country is required'],
     },
+    state_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'State',
+      required: [true, 'State is required'],
+    },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
@@ -31,6 +36,7 @@ const citySchema = new mongoose.Schema(
 );
 
 citySchema.index({ country_id: 1 });
+citySchema.index({ state_id: 1 });
 citySchema.index({ name: 1 });
 
 module.exports = mongoose.model('City', citySchema);

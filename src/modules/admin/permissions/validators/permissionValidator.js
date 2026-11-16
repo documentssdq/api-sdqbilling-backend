@@ -15,7 +15,8 @@ module.exports = {
     time: Joi.string().optional(),
     url: Joi.string().allow('').optional(),
     icon: Joi.string().allow('').optional(),
-    users: Joi.number().optional()
+    users: Joi.number().optional(),
+    isActive: Joi.boolean().optional()
   }),
 
   updatePermission: Joi.object({
@@ -32,6 +33,12 @@ module.exports = {
     time: Joi.string().optional(),
     url: Joi.string().allow('').optional(),
     icon: Joi.string().allow('').optional(),
-    users: Joi.number().optional()
-  })
+    users: Joi.number().optional(),
+    isActive: Joi.boolean().optional()
+  }),
+
+  statusPermission: Joi.object({
+    status: Joi.alternatives().try(Joi.boolean(), Joi.number().valid(0, 1)).optional(),
+    isActive: Joi.boolean().optional()
+  }).unknown(true)
 };

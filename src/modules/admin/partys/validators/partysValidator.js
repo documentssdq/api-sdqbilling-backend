@@ -37,18 +37,34 @@ module.exports = {
       }),
     taxType: Joi.string().valid('GST', 'VAT').allow('', null).optional(),
     currency_id: Joi.alternatives().try(
-      Joi.string().allow('', null),
-      Joi.object()
-    ).optional(),
+      Joi.string().required(),
+      Joi.object().required()
+    ).required().messages({
+      'string.empty': 'Currency is required',
+      'any.required': 'Currency is required',
+    }),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
-      Joi.string().allow('', null),
-      Joi.object()
-    ).optional(),
+      Joi.string().required(),
+      Joi.object().required()
+    ).required().messages({
+      'string.empty': 'Country is required',
+      'any.required': 'Country is required',
+    }),
+    state_id: Joi.alternatives().try(
+      Joi.string().required(),
+      Joi.object().required()
+    ).required().messages({
+      'string.empty': 'State is required',
+      'any.required': 'State is required',
+    }),
     city_id: Joi.alternatives().try(
-      Joi.string().allow('', null),
-      Joi.object()
-    ).optional(),
+      Joi.string().required(),
+      Joi.object().required()
+    ).required().messages({
+      'string.empty': 'City is required',
+      'any.required': 'City is required',
+    }),
     address: Joi.string().allow('', null).max(300).optional(),
     description: Joi.string().allow('', null).max(500).optional(),
     isActive: Joi.boolean().optional(),
@@ -89,6 +105,10 @@ module.exports = {
     ).optional(),
     gstin: Joi.string().allow('', null).max(20).optional(),
     country_id: Joi.alternatives().try(
+      Joi.string().allow('', null),
+      Joi.object()
+    ).optional(),
+    state_id: Joi.alternatives().try(
       Joi.string().allow('', null),
       Joi.object()
     ).optional(),

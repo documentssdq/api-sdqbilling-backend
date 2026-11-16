@@ -1,5 +1,6 @@
 const Group = require('../modules/admin/groups/models/groupModel');
 const Permission = require('../modules/admin/permissions/models/Permission');
+const { normalizeModuleKey } = require('../utils/moduleNameNormalizer');
 
 module.exports = (config, action) => {
   return async (req, res, next) => {
@@ -18,11 +19,12 @@ module.exports = (config, action) => {
         return next();
       }
 
-      const group = await Group.findOne({ $or: [{ id: user.group }, { name: user.group }] });
-      if (!group) {
+      const groupRef = user.group || user.groupId;
+      const group = await Group.findOne({ $or: [{ id: groupRef }, { name: groupRef }] });
+      if (!group || group.status === 'Inactive') {
         return res.status(403).json({
           success: false,
-          message: 'Permission denied. Invalid group.',
+          message: 'Permission denied. Invalid or inactive group.',
         });
       }
 
@@ -31,18 +33,29 @@ module.exports = (config, action) => {
       if (!moduleName) return next();
       const type = typeof config === 'object' && config.type ? config.type : 'group-access';
       const category = typeof config === 'object' && config.category ? config.category : undefined;
+      const escapedModule = moduleName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const query = { 
-        type, 
-        groupId: group.id, 
-        moduleName: { $regex: new RegExp(`^${moduleName}$`, 'i') } 
+      const query = {
+        type,
+        groupId: group.id,
+        moduleName: { $regex: new RegExp(`^${escapedModule}$`, 'i') },
       };
 
       if (category) {
         query.category = category;
       }
 
-      const rule = await Permission.findOne(query);
+      let rule = await Permission.findOne(query);
+
+      if (!rule) {
+        const canonicalTarget = normalizeModuleKey(moduleName);
+        if (canonicalTarget) {
+          const groupRules = await Permission.find({ type, groupId: group.id });
+          rule = groupRules.find(
+            (r) => normalizeModuleKey(r.moduleName) === canonicalTarget
+          ) || null;
+        }
+      }
 
       if (!rule) {
         return res.status(403).json({

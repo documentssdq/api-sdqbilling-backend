@@ -1,6 +1,210 @@
-﻿const Auth = require('../../admin/users/models/usersModel');
+const Auth = require('../../admin/users/models/usersModel');
 const tokenService = require('../../../services/tokenService');
 const logger = require('../../../services/logger');
+const {
+  normalizeExactModuleKey,
+  normalizeModuleKey,
+  getDefaultModuleUrl,
+} = require('../../../utils/moduleNameNormalizer');
+
+const buildAccessRulesForUser = async (userObj) => {
+  const Permission = require('../../admin/permissions/models/Permission');
+  const stdPerms = await Permission.find({ type: 'standard' });
+  const stdByExact = new Map();
+  const stdByCanonical = new Map();
+  for (const p of stdPerms) {
+    const exactKey = normalizeExactModuleKey(p.name);
+    const canonicalKey = normalizeModuleKey(p.name);
+    if (exactKey && !stdByExact.has(exactKey)) {
+      stdByExact.set(exactKey, p);
+    }
+    if (canonicalKey && !stdByCanonical.has(canonicalKey)) {
+      stdByCanonical.set(canonicalKey, p);
+    }
+  }
+
+  const findStdPerm = (moduleName) => {
+    const exactKey = normalizeExactModuleKey(moduleName);
+    if (exactKey && stdByExact.has(exactKey)) {
+      return stdByExact.get(exactKey);
+    }
+    const canonicalKey = normalizeModuleKey(moduleName);
+    if (canonicalKey && stdByCanonical.has(canonicalKey)) {
+      return stdByCanonical.get(canonicalKey);
+    }
+    return null;
+  };
+
+  let registry = await Permission.find({ type: 'module-registry' });
+  if (!registry || registry.length === 0) {
+    registry = stdPerms.map((p) => ({
+      moduleName: p.name,
+      category: p.category || 'Management',
+      url: p.url || getDefaultModuleUrl(p.name) || '',
+      icon: p.icon || '',
+      isActive: p.isActive !== false,
+    }));
+  } else {
+    registry = registry.map((r) => {
+      const obj = typeof r.toObject === 'function' ? r.toObject() : { ...r };
+      const std = findStdPerm(obj.moduleName);
+      return {
+        ...obj,
+        url: obj.url || std?.url || getDefaultModuleUrl(obj.moduleName) || '',
+        icon: obj.icon || std?.icon || '',
+        category: obj.category || std?.category || 'Management',
+        isActive: std ? std.isActive !== false : obj.isActive !== false,
+      };
+    });
+    for (const p of stdPerms) {
+      const exactKey = normalizeExactModuleKey(p.name);
+      const canonicalKey = normalizeModuleKey(p.name);
+      const alreadyPresent = registry.some((r) => {
+        const regExact = normalizeExactModuleKey(r.moduleName);
+        if (exactKey && regExact === exactKey) return true;
+        return canonicalKey && normalizeModuleKey(r.moduleName) === canonicalKey;
+      });
+      if (exactKey && !alreadyPresent) {
+        registry.push({
+          moduleName: p.name,
+          category: p.category || 'Management',
+          url: p.url || getDefaultModuleUrl(p.name) || '',
+          icon: p.icon || '',
+          isActive: p.isActive !== false,
+        });
+      }
+    }
+  }
+
+  let accessRules = [];
+  if (userObj.groupId || userObj.group) {
+    const Group = require('../../admin/groups/models/groupModel');
+    const mongoose = require('mongoose');
+    const searchId = userObj.groupId || userObj.group;
+    const q = [{ id: searchId }, { name: searchId }];
+    if (mongoose.Types.ObjectId.isValid(searchId)) {
+      q.push({ _id: searchId });
+    }
+    const group = await Group.findOne({ $or: q });
+    if (group) {
+      userObj.groupName = group.name;
+    }
+
+    const isGroupActive = group ? group.status !== 'Inactive' : true;
+    const isAdmin = group && (group.id === 'GRP-1' || group.name === 'Super Admin');
+
+    let rawRules = [];
+    if (group) {
+      rawRules = await Permission.find({ type: 'group-access', groupId: group.id });
+    }
+
+    const representedCanonicalKeys = new Set();
+
+    accessRules = registry.map((reg) => {
+      const exactKey = normalizeExactModuleKey(reg.moduleName);
+      const canonicalKey = normalizeModuleKey(reg.moduleName);
+      if (canonicalKey) {
+        representedCanonicalKeys.add(canonicalKey);
+      }
+      const std = findStdPerm(reg.moduleName);
+      const moduleIsActive = isGroupActive && (std ? std.isActive !== false : reg.isActive !== false);
+
+      let existingRule = rawRules.find(
+        (r) => normalizeExactModuleKey(r.moduleName) === exactKey
+      );
+      let canonicalMatches = [];
+      if (!existingRule && canonicalKey) {
+        canonicalMatches = rawRules.filter(
+          (r) => normalizeModuleKey(r.moduleName) === canonicalKey
+        );
+        existingRule = canonicalMatches[0];
+      }
+
+      if (existingRule) {
+        const ruleObj = existingRule.toObject();
+        const combinedRead = canonicalMatches.length > 1
+          ? canonicalMatches.some((r) => Boolean(r.read))
+          : Boolean(ruleObj.read);
+        const combinedWrite = canonicalMatches.length > 1
+          ? canonicalMatches.some((r) => Boolean(r.write))
+          : Boolean(ruleObj.write);
+        const combinedDelete = canonicalMatches.length > 1
+          ? canonicalMatches.some((r) => Boolean(r.delete))
+          : Boolean(ruleObj.delete);
+        const combinedExport = canonicalMatches.length > 1
+          ? canonicalMatches.some((r) => Boolean(r.export))
+          : Boolean(ruleObj.export);
+
+        return {
+          ...ruleObj,
+          moduleName: std?.name || reg.moduleName || ruleObj.moduleName,
+          category: ruleObj.category || reg.category || std?.category || 'Management',
+          url: reg.url || std?.url || ruleObj.url || getDefaultModuleUrl(reg.moduleName) || '',
+          icon: reg.icon || std?.icon || '',
+          isActive: moduleIsActive,
+          read: isGroupActive ? (isAdmin ? true : combinedRead) : false,
+          write: isGroupActive ? (isAdmin ? true : combinedWrite) : false,
+          delete: isGroupActive ? (isAdmin ? true : combinedDelete) : false,
+          export: isGroupActive ? (isAdmin ? true : combinedExport) : false,
+        };
+      }
+
+      return {
+        moduleName: reg.moduleName,
+        category: reg.category || std?.category || 'Management',
+        url: reg.url || std?.url || getDefaultModuleUrl(reg.moduleName) || '',
+        icon: reg.icon || std?.icon || '',
+        isActive: moduleIsActive,
+        read: isGroupActive ? Boolean(isAdmin) : false,
+        write: isGroupActive ? Boolean(isAdmin) : false,
+        delete: isGroupActive ? Boolean(isAdmin) : false,
+        export: isGroupActive ? Boolean(isAdmin) : false,
+        order: 999,
+      };
+    });
+
+    rawRules.forEach((rule) => {
+      const exactKey = normalizeExactModuleKey(rule.moduleName);
+      const canonicalKey = normalizeModuleKey(rule.moduleName);
+      const alreadyIncluded = accessRules.some((r) => {
+        const rExact = normalizeExactModuleKey(r.moduleName);
+        if (exactKey && rExact === exactKey) return true;
+        return canonicalKey && normalizeModuleKey(r.moduleName) === canonicalKey;
+      });
+      if (!alreadyIncluded && (!canonicalKey || !representedCanonicalKeys.has(canonicalKey))) {
+        if (canonicalKey) {
+          representedCanonicalKeys.add(canonicalKey);
+        }
+        const rObj = rule.toObject();
+        const std = findStdPerm(rule.moduleName);
+        const moduleIsActive = isGroupActive && (std ? std.isActive !== false : true);
+        rObj.isActive = moduleIsActive;
+        rObj.url = rObj.url || std?.url || getDefaultModuleUrl(rule.moduleName) || '';
+        rObj.icon = rObj.icon || std?.icon || '';
+        if (!isGroupActive) {
+          rObj.read = false;
+          rObj.write = false;
+          rObj.delete = false;
+          rObj.export = false;
+        } else if (isAdmin) {
+          rObj.read = true;
+          rObj.write = true;
+          rObj.delete = true;
+          rObj.export = true;
+        }
+        accessRules.push(rObj);
+      }
+    });
+
+    accessRules.sort((a, b) => {
+      const orderA = a.order !== undefined && a.order !== null ? a.order : 999;
+      const orderB = b.order !== undefined && b.order !== null ? b.order : 999;
+      return orderA - orderB;
+    });
+  }
+
+  return accessRules;
+};
 
 module.exports = {
   async register(data) {
@@ -71,85 +275,7 @@ module.exports = {
       delete userObj.password;
 
       // Fetch group access rules
-      let accessRules = [];
-      const Permission = require('../../admin/permissions/models/Permission');
-      let registry = await Permission.find({ type: 'module-registry' });
-      
-      // Fallback: If module-registry is empty, use 'standard' permissions as the source of truth for all available modules
-      if (!registry || registry.length === 0) {
-        const stdPerms = await Permission.find({ type: 'standard' });
-        registry = stdPerms.map(p => ({
-          moduleName: p.name,
-          category: p.category || 'System',
-          url: p.url || '',
-          icon: p.icon || ''
-        }));
-      }
-
-      if (userObj.groupId || userObj.group) {
-        const Group = require('../../admin/groups/models/groupModel');
-        let group = null;
-        if (userObj.groupId || userObj.group) {
-          let searchId = userObj.groupId || userObj.group; const mongoose = require('mongoose'); let q = [{ id: searchId }, { name: searchId }]; if(mongoose.Types.ObjectId.isValid(searchId)) { q.push({ _id: searchId }); } group = await Group.findOne({ $or: q });
-        }
-        if (group) {
-          userObj.groupName = group.name;
-        }
-        const isAdmin = group && (group.id === 'GRP-1' || group.name === 'Super Admin');
-        
-        let rawRules = [];
-        if (group) {
-          rawRules = await Permission.find({ type: 'group-access', groupId: group.id });
-        }
-        
-        accessRules = registry.map(reg => {
-          const existingRule = rawRules.find(r => r.moduleName === reg.moduleName);
-          if (existingRule) {
-            return {
-              ...existingRule.toObject(),
-              url: reg.url,
-              icon: reg.icon,
-              read: isAdmin ? true : existingRule.read,
-              write: isAdmin ? true : existingRule.write,
-              delete: isAdmin ? true : existingRule.delete,
-              export: isAdmin ? true : existingRule.export
-            };
-          }
-          return {
-            moduleName: reg.moduleName,
-            category: reg.category,
-            url: reg.url,
-            icon: reg.icon,
-            read: isAdmin ? true : false,
-            write: isAdmin ? true : false,
-            delete: isAdmin ? true : false,
-            export: isAdmin ? true : false,
-            order: 999
-          };
-        });
-        
-        // Also include any rawRules that are not in the registry
-        rawRules.forEach(rule => {
-           if (!accessRules.find(r => r.moduleName === rule.moduleName)) {
-               const rObj = rule.toObject();
-               if (isAdmin) {
-                 rObj.read = true;
-                 rObj.write = true;
-                 rObj.delete = true;
-                 rObj.export = true;
-               }
-               accessRules.push(rObj);
-           }
-        });
-
-        // Sort accessRules by order
-        accessRules.sort((a, b) => {
-           const orderA = a.order !== undefined && a.order !== null ? a.order : 999;
-           const orderB = b.order !== undefined && b.order !== null ? b.order : 999;
-           return orderA - orderB;
-        });
-      }
-      userObj.accessRules = accessRules;
+      userObj.accessRules = await buildAccessRulesForUser(userObj);
 
       return {
         token,
@@ -168,84 +294,7 @@ module.exports = {
       const userObj = user.toObject();
       delete userObj.password;
 
-      let accessRules = [];
-      const Permission = require('../../admin/permissions/models/Permission');
-      let registry = await Permission.find({ type: 'module-registry' });
-      
-      if (!registry || registry.length === 0) {
-        const stdPerms = await Permission.find({ type: 'standard' });
-        registry = stdPerms.map(p => ({
-          moduleName: p.name,
-          category: p.category || 'Management',
-          url: p.url || '',
-          icon: p.icon || ''
-        }));
-      }
-
-      if (userObj.groupId || userObj.group) {
-        const Group = require('../../admin/groups/models/groupModel');
-        let group = null;
-        if (userObj.groupId || userObj.group) {
-          let searchId = userObj.groupId || userObj.group; const mongoose = require('mongoose'); let q = [{ id: searchId }, { name: searchId }]; if(mongoose.Types.ObjectId.isValid(searchId)) { q.push({ _id: searchId }); } group = await Group.findOne({ $or: q });
-        }
-        if (group) {
-          userObj.groupName = group.name;
-        }
-        const isAdmin = group && (group.id === 'GRP-1' || group.name === 'Super Admin');
-        
-        let rawRules = [];
-        if (group) {
-          rawRules = await Permission.find({ type: 'group-access', groupId: group.id });
-        }
-        
-        accessRules = registry.map(reg => {
-          const existingRule = rawRules.find(r => r.moduleName === reg.moduleName);
-          if (existingRule) {
-            return {
-              ...existingRule.toObject(),
-              url: reg.url,
-              icon: reg.icon,
-              read: isAdmin ? true : existingRule.read,
-              write: isAdmin ? true : existingRule.write,
-              delete: isAdmin ? true : existingRule.delete,
-              export: isAdmin ? true : existingRule.export
-            };
-          }
-          return {
-            moduleName: reg.moduleName,
-            category: reg.category,
-            url: reg.url,
-            icon: reg.icon,
-            read: isAdmin ? true : false,
-            write: isAdmin ? true : false,
-            delete: isAdmin ? true : false,
-            export: isAdmin ? true : false,
-            order: 999
-          };
-        });
-        
-        // Also include any rawRules that are not in the registry
-        rawRules.forEach(rule => {
-           if (!accessRules.find(r => r.moduleName === rule.moduleName)) {
-               const rObj = rule.toObject();
-               if (isAdmin) {
-                 rObj.read = true;
-                 rObj.write = true;
-                 rObj.delete = true;
-                 rObj.export = true;
-               }
-               accessRules.push(rObj);
-           }
-        });
-
-        // Sort accessRules by order
-        accessRules.sort((a, b) => {
-           const orderA = a.order !== undefined && a.order !== null ? a.order : 999;
-           const orderB = b.order !== undefined && b.order !== null ? b.order : 999;
-           return orderA - orderB;
-        });
-      }
-      userObj.accessRules = accessRules;
+      userObj.accessRules = await buildAccessRulesForUser(userObj);
 
       return { user: userObj };
     } catch (error) {

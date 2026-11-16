@@ -26,6 +26,7 @@ const permissionSchema = new Schema({
   url: { type: String },
   icon: { type: String },
   users: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
   
   // Group Access fields
   groupId: { 

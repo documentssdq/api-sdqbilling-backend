@@ -1,5 +1,26 @@
 const Permission = require('../models/Permission');
 const Group = require('../../groups/models/groupModel');
+const { normalizeModuleKey } = require('../../../../utils/moduleNameNormalizer');
+
+const serializePermission = (doc) => {
+  if (!doc) return doc;
+  const obj = typeof doc.toJSON === 'function' ? doc.toJSON() : { ...doc };
+  return {
+    ...obj,
+    isActive: obj.isActive !== false,
+  };
+};
+
+const syncModuleRegistryStatus = async (moduleName, isActive) => {
+  const canonicalTarget = normalizeModuleKey(moduleName);
+  if (!canonicalTarget) return;
+  const registryDocs = await Permission.find({ type: 'module-registry' });
+  for (const reg of registryDocs) {
+    if (normalizeModuleKey(reg.moduleName) === canonicalTarget) {
+      await Permission.findByIdAndUpdate(reg._id, { isActive });
+    }
+  }
+};
 
 const updateGroupPermissionsCount = async (groupId) => {
   const activeCount = await Permission.countDocuments({
@@ -30,7 +51,8 @@ exports.getAll = async (req, res) => {
         await perm.save();
       }
     }
-    res.json({ success: true, data: permissions });
+    const normalized = permissions.map(serializePermission);
+    res.json({ success: true, data: normalized });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch permissions', error: error.message });
   }
@@ -45,6 +67,7 @@ exports.create = async (req, res) => {
     if (!payload.time) payload.time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
     if (!payload.users) payload.users = 0;
     if (!payload.roles) payload.roles = [];
+    if (payload.isActive === undefined) payload.isActive = true;
 
     const newPermission = new Permission(payload);
     await newPermission.save();
@@ -71,7 +94,9 @@ exports.create = async (req, res) => {
       }
     }
 
-    res.status(201).json({ success: true, data: newPermission });
+    await syncModuleRegistryStatus(newPermission.name, newPermission.isActive !== false);
+
+    res.status(201).json({ success: true, data: serializePermission(newPermission) });
   } catch (error) {
     res.status(400).json({ success: false, message: 'Failed to create permission', error: error.message });
   }
@@ -147,7 +172,11 @@ exports.update = async (req, res) => {
       }
     }
 
-    res.json({ success: true, data: updatedPermission });
+    if (updatedPermission.type === 'standard') {
+      await syncModuleRegistryStatus(updatedPermission.name, updatedPermission.isActive !== false);
+    }
+
+    res.json({ success: true, data: serializePermission(updatedPermission) });
   } catch (error) {
     res.status(400).json({ success: false, message: 'Failed to update permission', error: error.message });
   }
@@ -183,5 +212,27 @@ exports.delete = async (req, res) => {
     res.json({ success: true, data: deletedPermission });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete permission', error: error.message });
+  }
+};
+
+exports.status = async (req, res) => {
+  try {
+    const raw = req.body.isActive !== undefined ? req.body.isActive : req.body.status;
+    const isActive = raw === true || raw === 1 || raw === 'true';
+    const updated = await Permission.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Permission not found' });
+    }
+    if (updated.type === 'standard') {
+      await syncModuleRegistryStatus(updated.name, updated.isActive !== false);
+    }
+    const data = serializePermission(updated);
+    res.json({ success: true, data, message: 'Permission status updated successfully' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Failed to update permission status', error: error.message });
   }
 };

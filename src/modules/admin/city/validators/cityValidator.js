@@ -8,6 +8,10 @@ module.exports = {
       'string.empty': 'Country is required',
       'any.required': 'Country is required',
     }),
+    state_id: Joi.string().required().messages({
+      'string.empty': 'State is required',
+      'any.required': 'State is required',
+    }),
     name: Joi.string().trim().min(1).max(100).required().messages({
       'string.empty': 'City name is required',
       'any.required': 'City name is required',
@@ -21,6 +25,7 @@ module.exports = {
     id: Joi.string().allow('', null).optional(),
     _id: Joi.any().optional(),
     country_id: Joi.string().optional(),
+    state_id: Joi.string().optional(),
     name: Joi.string().trim().min(1).max(100).optional().messages({
       'string.empty': 'City name cannot be empty',
       'string.min': 'City name must be at least 1 character long',

@@ -38,6 +38,11 @@ const partysSchema = new mongoose.Schema(
       ref: 'Countries',
       default: null,
     },
+    state_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'State',
+      default: null,
+    },
     city_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'City',
@@ -73,6 +78,7 @@ partysSchema.index({ email: 1 }, { unique: true });
 partysSchema.index({ gstin: 1 });
 partysSchema.index({ currency_id: 1 });
 partysSchema.index({ country_id: 1 });
+partysSchema.index({ state_id: 1 });
 partysSchema.index({ city_id: 1 });
 
 module.exports = mongoose.model('Partys', partysSchema);

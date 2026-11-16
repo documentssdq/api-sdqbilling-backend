@@ -10,6 +10,7 @@ const permissionsConfig = { moduleName: 'Permissions', type: 'group-access' };
 router.get('/', authenticate, permission(permissionsConfig, 'READ'), PermissionController.getAll);
 router.post('/', authenticate, permission(permissionsConfig, 'WRITE'), validate(permissionValidator.createPermission), PermissionController.create);
 router.put('/:id', authenticate, permission(permissionsConfig, 'WRITE'), validate(permissionValidator.updatePermission), PermissionController.update);
+router.patch('/status/:id', authenticate, permission(permissionsConfig, 'WRITE'), validate(permissionValidator.statusPermission), PermissionController.status);
 router.delete('/:id', authenticate, permission(permissionsConfig, 'DELETE'), PermissionController.delete);
 
 module.exports = router;

@@ -8,6 +8,7 @@ const stateSchema = new mongoose.Schema(
       required: [true, 'Country is required'],
     },
     name: { type: String, required: true, trim: true },
+    code: { type: String, trim: true, default: '' },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
   },
@@ -32,5 +33,6 @@ const stateSchema = new mongoose.Schema(
 
 stateSchema.index({ country_id: 1 });
 stateSchema.index({ name: 1 });
+stateSchema.index({ code: 1 });
 
 module.exports = mongoose.model('State', stateSchema);

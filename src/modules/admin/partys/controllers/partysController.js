@@ -6,7 +6,8 @@ class PartysController extends BaseController {
     try {
       const pageNum = parseInt(req.query.page, 10) || 1;
       const limitNum = parseInt(req.query.limit, 10) || 10;
-      const data = await PartysService.getAll(pageNum, limitNum);
+      const partyType = req.query.partyType || req.query.type;
+      const data = await PartysService.getAll(pageNum, limitNum, partyType);
       this.paginated(res, data.data, data.total, pageNum, limitNum, 'Partys fetched successfully');
     } catch (error) {
       this.error(res, error.message, 500);

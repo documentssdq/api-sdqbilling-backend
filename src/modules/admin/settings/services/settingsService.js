@@ -1,5 +1,19 @@
+const mongoose = require('mongoose');
 const Settings = require('../models/settingsModel');
 const logger = require('../../../../services/logger');
+
+const buildKeyVariants = (identifier) => {
+  const raw = String(identifier || '').trim();
+  if (!raw) return [];
+  const unwrapped = raw.replace(/^setting\(['"](.+)['"]\)$/, '$1');
+  const wrapped = `setting('${unwrapped}')`;
+  return Array.from(new Set([raw, unwrapped, wrapped]));
+};
+
+const findFallbackSetting = (list, identifier) => {
+  const variants = buildKeyVariants(identifier);
+  return list.find((s) => s.id === identifier || variants.includes(s.key)) || null;
+};
 
 // Initial default settings to seed if DB is empty or fallback when offline
 let inMemorySettings = [
@@ -69,7 +83,33 @@ let inMemorySettings = [
     group: 'Email / SMTP',
     value: 'smtp.gmail.com',
   },
+  {
+    id: 'SET-9',
+    displayName: 'Purchase Prefix',
+    key: "setting('prefixes.purchase')",
+    type: 'text',
+    group: 'Prefixes',
+    value: 'BILL/P',
+  },
+  {
+    id: 'SET-10',
+    displayName: 'Purchase Order Prefix',
+    key: "setting('prefixes.purchaseorder')",
+    type: 'text',
+    group: 'Prefixes',
+    value: 'PO',
+  },
+  {
+    id: 'SET-11',
+    displayName: 'Sale Order Prefix',
+    key: "setting('prefixes.saleorder')",
+    type: 'text',
+    group: 'Prefixes',
+    value: 'SO',
+  },
 ];
+
+const DEFAULT_SETTINGS = [...inMemorySettings];
 
 module.exports = {
   async getAll() {
@@ -78,6 +118,18 @@ module.exports = {
       if (count === 0) {
         logger.info('Seeding initial website settings into MongoDB...');
         await Settings.insertMany(inMemorySettings);
+      } else {
+        const hasSaleorderPrefix = await Settings.exists({
+          key: { $in: ["setting('prefixes.saleorder')", 'prefixes.saleorder'] },
+        });
+        if (!hasSaleorderPrefix) {
+          const saleorderPrefixDefault = DEFAULT_SETTINGS.find(
+            (s) => s.key === "setting('prefixes.saleorder')"
+          );
+          if (saleorderPrefixDefault) {
+            await Settings.create(saleorderPrefixDefault).catch(() => null);
+          }
+        }
       }
       const data = await Settings.find().sort({ createdAt: -1 });
       // Update inMemory backup just in case
@@ -90,12 +142,24 @@ module.exports = {
   },
 
   async getByIdOrKey(identifier) {
+    const raw = String(identifier || '').trim();
+    const variants = buildKeyVariants(raw);
+    const orConditions = [{ id: raw }, { key: { $in: variants } }];
+    if (mongoose.Types.ObjectId.isValid(raw)) {
+      orConditions.push({ _id: raw });
+    }
     try {
-      const item = await Settings.findOne({ $or: [{ id: identifier }, { key: identifier }, { _id: identifier }] });
+      const item = await Settings.findOne({ $or: orConditions });
       if (item) return item.toObject ? item.toObject() : item;
-      return inMemorySettings.find((s) => s.id === identifier || s.key === identifier) || null;
+      return (
+        findFallbackSetting(inMemorySettings, raw) ||
+        findFallbackSetting(DEFAULT_SETTINGS, raw)
+      );
     } catch (error) {
-      return inMemorySettings.find((s) => s.id === identifier || s.key === identifier) || null;
+      return (
+        findFallbackSetting(inMemorySettings, raw) ||
+        findFallbackSetting(DEFAULT_SETTINGS, raw)
+      );
     }
   },
 

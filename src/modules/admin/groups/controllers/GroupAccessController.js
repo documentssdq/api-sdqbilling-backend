@@ -1,7 +1,21 @@
 const Permission = require('../../permissions/models/Permission');
 const Group = require('../../groups/models/groupModel');
 const BaseController = require('../../../../core/BaseController');
+const {
+  normalizeExactModuleKey,
+  normalizeModuleKey,
+} = require('../../../../utils/moduleNameNormalizer');
 const baseController = new BaseController();
+
+const findStandardPermissionByModuleName = async (moduleName) => {
+  if (!moduleName) return null;
+  let stdPerm = await Permission.findOne({ type: 'standard', name: moduleName });
+  if (stdPerm) return stdPerm;
+  const canonicalTarget = normalizeModuleKey(moduleName);
+  if (!canonicalTarget) return null;
+  const allStd = await Permission.find({ type: 'standard' });
+  return allStd.find((p) => normalizeModuleKey(p.name) === canonicalTarget) || null;
+};
 
 const updateGroupPermissionsCount = async (groupId) => {
   const activeCount = await Permission.countDocuments({
@@ -58,7 +72,11 @@ exports.getAll = async (req, res) => {
 
     // Merge existing rules with the registry so the UI always has a complete matrix
     const mergedRules = registry.map((reg, index) => {
-      const existingRule = rules.find(r => r.moduleName === reg.moduleName);
+      const exactKey = normalizeExactModuleKey(reg.moduleName);
+      const canonicalKey = normalizeModuleKey(reg.moduleName);
+      const existingRule =
+        rules.find((r) => normalizeExactModuleKey(r.moduleName) === exactKey) ||
+        rules.find((r) => canonicalKey && normalizeModuleKey(r.moduleName) === canonicalKey);
       if (existingRule) {
         return existingRule;
       }
@@ -77,7 +95,13 @@ exports.getAll = async (req, res) => {
 
     // Append any existing rules that might not be in the registry or standard permissions
     rules.forEach(rule => {
-      if (!mergedRules.find(m => m.moduleName === rule.moduleName)) {
+      const exactKey = normalizeExactModuleKey(rule.moduleName);
+      const canonicalKey = normalizeModuleKey(rule.moduleName);
+      const alreadyMerged = mergedRules.find((m) => {
+        if (normalizeExactModuleKey(m.moduleName) === exactKey) return true;
+        return canonicalKey && normalizeModuleKey(m.moduleName) === canonicalKey;
+      });
+      if (!alreadyMerged) {
         mergedRules.push(rule.toObject ? rule.toObject({ virtuals: true, transform: (doc, ret) => { delete ret._id; return ret; } }) : rule);
       }
     });
@@ -121,7 +145,7 @@ exports.bulkSave = async (req, res) => {
       const groupObj = await Group.findOne({ id: groupId });
       if (groupObj) {
         for (const rule of rules) {
-          const stdPerm = await Permission.findOne({ type: 'standard', name: rule.moduleName });
+          const stdPerm = await findStandardPermissionByModuleName(rule.moduleName);
           const roleObj = {
             groupId: groupObj.id,
             className: groupObj.badgeVariant ? `bg-${groupObj.badgeVariant}-subtle text-${groupObj.badgeVariant}` : 'bg-primary-subtle text-primary'
@@ -176,7 +200,7 @@ exports.create = async (req, res) => {
       await updateGroupPermissionsCount(groupId);
 
       // Sync to standard permissions table
-      const stdPerm = await Permission.findOne({ type: 'standard', name: payload.moduleName });
+      const stdPerm = await findStandardPermissionByModuleName(payload.moduleName);
       const roleObj = {
         groupId: groupObj.id,
         className: groupObj.badgeVariant ? `bg-${groupObj.badgeVariant}-subtle text-${groupObj.badgeVariant}` : 'bg-primary-subtle text-primary'
@@ -249,7 +273,7 @@ exports.update = async (req, res) => {
       if (groupObj) {
         // If moduleName changed, remove from old standard permission
         if (oldRule && oldRule.moduleName !== updatedRule.moduleName) {
-          const oldStd = await Permission.findOne({ type: 'standard', name: oldRule.moduleName });
+          const oldStd = await findStandardPermissionByModuleName(oldRule.moduleName);
           if (oldStd) {
             oldStd.roles = oldStd.roles.filter(r => r.groupId !== groupObj.id);
             await oldStd.save();
@@ -257,7 +281,7 @@ exports.update = async (req, res) => {
         }
         
         // Sync with new/current standard permission
-        const newStd = await Permission.findOne({ type: 'standard', name: updatedRule.moduleName });
+        const newStd = await findStandardPermissionByModuleName(updatedRule.moduleName);
         const roleObj = {
           groupId: groupObj.id,
           className: groupObj.badgeVariant ? `bg-${groupObj.badgeVariant}-subtle text-${groupObj.badgeVariant}` : 'bg-primary-subtle text-primary'
@@ -311,7 +335,7 @@ exports.delete = async (req, res) => {
       await updateGroupPermissionsCount(groupId);
 
       // Remove from standard permissions table
-      const stdPerm = await Permission.findOne({ type: 'standard', name: deletedRule.moduleName });
+      const stdPerm = await findStandardPermissionByModuleName(deletedRule.moduleName);
       if (stdPerm) {
         await Permission.findByIdAndUpdate(stdPerm._id, { $pull: { roles: { groupId: groupObj.id } } });
       }

@@ -9,6 +9,7 @@ module.exports = {
       const total = await City.countDocuments();
       const data = await City.find()
         .populate('country_id', 'name')
+        .populate('state_id', 'name code')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
@@ -21,7 +22,9 @@ module.exports = {
 
   async getById(id) {
     try {
-      return await City.findById(id).populate('country_id', 'name');
+      return await City.findById(id)
+        .populate('country_id', 'name')
+        .populate('state_id', 'name code');
     } catch (error) {
       logger.error('Error in getById:', error);
       throw error;
@@ -33,18 +36,28 @@ module.exports = {
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
-      const existing = await City.findOne({
+      if (data.state_id && typeof data.state_id === 'object') {
+        data.state_id = data.state_id._id || data.state_id.id;
+      }
+      const existingQuery = {
         name: data.name,
-        country_id: data.country_id,
-      });
+      };
+      if (data.state_id) {
+        existingQuery.state_id = data.state_id;
+      } else if (data.country_id) {
+        existingQuery.country_id = data.country_id;
+      }
+      const existing = await City.findOne(existingQuery);
       if (existing) {
-        const err = new Error('City name already exists in this country');
+        const err = new Error('City name already exists in this state');
         err.field = 'name';
         err.statusCode = 400;
         throw err;
       }
       const created = await City.create(data);
-      return await City.findById(created._id).populate('country_id', 'name');
+      return await City.findById(created._id)
+        .populate('country_id', 'name')
+        .populate('state_id', 'name code');
     } catch (error) {
       logger.error('Error in create:', error);
       throw error;
@@ -56,20 +69,30 @@ module.exports = {
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
-      if (data.name && data.country_id) {
-        const existing = await City.findOne({
+      if (data.state_id && typeof data.state_id === 'object') {
+        data.state_id = data.state_id._id || data.state_id.id;
+      }
+      if (data.name && (data.state_id || data.country_id)) {
+        const existingQuery = {
           name: data.name,
-          country_id: data.country_id,
           _id: { $ne: id },
-        });
+        };
+        if (data.state_id) {
+          existingQuery.state_id = data.state_id;
+        } else if (data.country_id) {
+          existingQuery.country_id = data.country_id;
+        }
+        const existing = await City.findOne(existingQuery);
         if (existing) {
-          const err = new Error('City name already exists in this country');
+          const err = new Error('City name already exists in this state');
           err.field = 'name';
           err.statusCode = 400;
           throw err;
         }
       }
-      return await City.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate('country_id', 'name');
+      return await City.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+        .populate('country_id', 'name')
+        .populate('state_id', 'name code');
     } catch (error) {
       logger.error('Error in update:', error);
       throw error;

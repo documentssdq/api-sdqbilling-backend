@@ -13,6 +13,7 @@ const servicesSchema = new mongoose.Schema(
       default: null,
     },
     name: { type: String, required: true, trim: true },
+    hsn_code: { type: String, trim: true, default: '' },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
   },
@@ -38,5 +39,6 @@ const servicesSchema = new mongoose.Schema(
 servicesSchema.index({ category_id: 1 });
 servicesSchema.index({ subcategory_id: 1 });
 servicesSchema.index({ name: 1 });
+servicesSchema.index({ hsn_code: 1 });
 
 module.exports = mongoose.model('Services', servicesSchema);

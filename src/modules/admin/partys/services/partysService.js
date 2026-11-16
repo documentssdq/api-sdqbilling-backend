@@ -13,13 +13,24 @@ const normalizePhone = (phone) => {
 };
 
 module.exports = {
-  async getAll(page = 1, limit = 10) {
+  async getAll(page = 1, limit = 10, partyType = null) {
     try {
       const { skip } = formatPagination(page, limit);
-      const total = await Partys.countDocuments();
-      const data = await Partys.find()
+      const query = {};
+      if (partyType) {
+        if (Array.isArray(partyType)) {
+          query.partyType = { $in: partyType };
+        } else if (typeof partyType === 'string' && partyType.includes(',')) {
+          query.partyType = { $in: partyType.split(',').map((s) => s.trim().toLowerCase()) };
+        } else {
+          query.partyType = partyType.toLowerCase();
+        }
+      }
+      const total = await Partys.countDocuments(query);
+      const data = await Partys.find(query)
         .populate('country_id', 'name')
-        .populate('city_id', 'name country_id')
+        .populate('state_id', 'name code country_id')
+        .populate('city_id', 'name country_id state_id')
         .populate('currency_id', 'name code symbol')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -35,7 +46,8 @@ module.exports = {
     try {
       return await Partys.findById(id)
         .populate('country_id', 'name')
-        .populate('city_id', 'name country_id')
+        .populate('state_id', 'name code country_id')
+        .populate('city_id', 'name country_id state_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
       logger.error('Error in getById:', error);
@@ -84,12 +96,18 @@ module.exports = {
         }
       }
 
-      // 3. Normalize country_id, city_id, currency_id
+      // 3. Normalize country_id, state_id, city_id, currency_id
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
       if (!data.country_id) {
         data.country_id = null;
+      }
+      if (data.state_id && typeof data.state_id === 'object') {
+        data.state_id = data.state_id._id || data.state_id.id;
+      }
+      if (!data.state_id) {
+        data.state_id = null;
       }
       if (data.city_id && typeof data.city_id === 'object') {
         data.city_id = data.city_id._id || data.city_id.id;
@@ -107,7 +125,8 @@ module.exports = {
       const created = await Partys.create(data);
       return await Partys.findById(created._id)
         .populate('country_id', 'name')
-        .populate('city_id', 'name country_id')
+        .populate('state_id', 'name code country_id')
+        .populate('city_id', 'name country_id state_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
       logger.error('Error in create:', error);
@@ -165,12 +184,18 @@ module.exports = {
         }
       }
 
-      // 3. Normalize country_id, city_id, currency_id
+      // 3. Normalize country_id, state_id, city_id, currency_id
       if (data.country_id && typeof data.country_id === 'object') {
         data.country_id = data.country_id._id || data.country_id.id;
       }
       if (data.country_id === '') {
         data.country_id = null;
+      }
+      if (data.state_id && typeof data.state_id === 'object') {
+        data.state_id = data.state_id._id || data.state_id.id;
+      }
+      if (data.state_id === '') {
+        data.state_id = null;
       }
       if (data.city_id && typeof data.city_id === 'object') {
         data.city_id = data.city_id._id || data.city_id.id;
@@ -187,7 +212,8 @@ module.exports = {
 
       return await Partys.findByIdAndUpdate(id, data, { new: true, runValidators: true })
         .populate('country_id', 'name')
-        .populate('city_id', 'name country_id')
+        .populate('state_id', 'name code country_id')
+        .populate('city_id', 'name country_id state_id')
         .populate('currency_id', 'name code symbol');
     } catch (error) {
       logger.error('Error in update:', error);
